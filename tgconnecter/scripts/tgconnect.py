@@ -1,4 +1,5 @@
 from telethon import TelegramClient, events  # type: ignore
+from telethon.tl import types  # type: ignore
 from datetime import datetime
 import requests  # type: ignore
 import asyncio
@@ -41,6 +42,10 @@ def send_telegram_message(message):
 async def handler(event):
     user = await event.get_sender()
 
+    # Проверяем, что user не равен None
+    if user is None:
+        return
+
     # Проверяем, является ли пользователь одним из тех, кого мы отслеживаем
     if user.username in users_to_track or str(user.id) in users_to_track:
         current_status = user.status
@@ -50,16 +55,16 @@ async def handler(event):
         last_seen = last_seen_status.get(user.username or str(user.id))
 
         # Если пользователь онлайн
-        if isinstance(current_status, telethon.tl.types.UserStatusOnline):  # type: ignore
-            if last_seen is None or not isinstance(last_seen, telethon.tl.types.UserStatusOnline):  # type: ignore
+        if isinstance(current_status, types.UserStatusOnline):
+            if last_seen is None or not isinstance(last_seen, types.UserStatusOnline):
                 print(f"{user.username or user.id} вошел в сеть: {now}")
                 last_seen_status[user.username or str(user.id)] = current_status
                 # Отправляем уведомление в Telegram
                 send_telegram_message(f"{user.username or user.id} вошел в сеть в {now}")
 
         # Если пользователь вышел из сети
-        elif isinstance(current_status, telethon.tl.types.UserStatusOffline):  # type: ignore
-            if last_seen is not None and isinstance(last_seen, telethon.tl.types.UserStatusOnline):  # type: ignore
+        elif isinstance(current_status, types.UserStatusOffline):
+            if last_seen is not None and isinstance(last_seen, types.UserStatusOnline):
                 print(f"{user.username or user.id} вышел из сети: {now}")
                 last_seen_status[user.username or str(user.id)] = current_status
                 # Отправляем уведомление в Telegram
