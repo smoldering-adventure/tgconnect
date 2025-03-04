@@ -1,19 +1,16 @@
 from telethon import TelegramClient, events  # type: ignore
-from telethon.tl.types import UserStatusOnline, UserStatusOffline  # type: ignore
 from datetime import datetime
-import smtplib
-from email.mime.text import MIMEText
+import requests  # type: ignore
 import asyncio
 
 # Ваши данные API Telegram
-api_id = '28959681'
-api_hash = 'de1a5bdef4d5c7b9a2f6138219fb7b3f'
-phone_number = '79522480324'
+api_id = '28959681'  # Замените на ваш API ID
+api_hash = 'de1a5bdef4d5c7b9a2f6138219fb7b3f'  # Замените на ваш API Hash
+phone_number = '79522480324'  # Ваш номер телефона
 
-# Данные для отправки почты через Gmail
-gmail_user = 'm.p.w.200032@gmail.com'  # Ваш Gmail
-gmail_password = '32022010'  # Пароль от Gmail или пароль приложения
-to_email = 'm.p.w.200032@gmail.com'  # Почта, на которую будут отправляться уведомления
+# Токен вашего бота и chat_id
+BOT_TOKEN = '7682182486:AAFLLXRZoN1tPu0taAPNqga31q_Eq6GDWpI'  # Замените на токен вашего бота
+CHAT_ID = '5159723893'  # Замените на ваш chat_id
 
 # Список пользователей для отслеживания (username или ID)
 users_to_track = ['5239948967', '5159723893']  # Замените на реальные username или ID
@@ -24,22 +21,21 @@ client = TelegramClient('session_name', api_id, api_hash)
 # Словарь для хранения последнего известного статуса каждого пользователя
 last_seen_status = {user: None for user in users_to_track}
 
-# Функция для отправки email
-def send_email(subject, body):
+def send_telegram_message(message):
+    """Отправляет сообщение в Telegram."""
+    url = f'https://api.telegram.org/bot{BOT_TOKEN}/sendMessage'
+    payload = {
+        'chat_id': CHAT_ID,
+        'text': message,
+    }
     try:
-        # Создаем сообщение
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = gmail_user
-        msg['To'] = to_email
-
-        # Отправляем сообщение через SMTP-сервер Gmail
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(gmail_user, gmail_password)
-            server.sendmail(gmail_user, to_email, msg.as_string())
-        print("Уведомление отправлено на почту.")
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            print("Уведомление отправлено в Telegram.")
+        else:
+            print(f"Ошибка при отправке сообщения: {response.status_code}")
     except Exception as e:
-        print(f"Ошибка при отправке email: {e}")
+        print(f"Ошибка при отправке сообщения: {e}")
 
 @client.on(events.UserUpdate)
 async def handler(event):
@@ -54,26 +50,20 @@ async def handler(event):
         last_seen = last_seen_status.get(user.username or str(user.id))
 
         # Если пользователь онлайн
-        if isinstance(current_status, UserStatusOnline):
-            if last_seen is None or not isinstance(last_seen, UserStatusOnline):
+        if isinstance(current_status, telethon.tl.types.UserStatusOnline):  # type: ignore
+            if last_seen is None or not isinstance(last_seen, telethon.tl.types.UserStatusOnline):  # type: ignore
                 print(f"{user.username or user.id} вошел в сеть: {now}")
                 last_seen_status[user.username or str(user.id)] = current_status
-                # Отправляем уведомление на почту
-                send_email(
-                    f"Telegram: {user.username or user.id} вошел в сеть",
-                    f"{user.username or user.id} вошел в сеть в {now}"
-                )
+                # Отправляем уведомление в Telegram
+                send_telegram_message(f"{user.username or user.id} вошел в сеть в {now}")
 
         # Если пользователь вышел из сети
-        elif isinstance(current_status, UserStatusOffline):
-            if last_seen is not None and isinstance(last_seen, UserStatusOnline):
+        elif isinstance(current_status, telethon.tl.types.UserStatusOffline):  # type: ignore
+            if last_seen is not None and isinstance(last_seen, telethon.tl.types.UserStatusOnline):  # type: ignore
                 print(f"{user.username or user.id} вышел из сети: {now}")
                 last_seen_status[user.username or str(user.id)] = current_status
-                # Отправляем уведомление на почту
-                send_email(
-                    f"Telegram: {user.username or user.id} вышел из сети",
-                    f"{user.username or user.id} вышел из сети в {now}"
-                )
+                # Отправляем уведомление в Telegram
+                send_telegram_message(f"{user.username or user.id} вышел из сети в {now}")
 
 async def main():
     await client.start(phone_number)
