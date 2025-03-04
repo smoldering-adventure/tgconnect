@@ -1,3 +1,5 @@
+import signal
+import sys
 from telethon import TelegramClient, events  # type: ignore
 from telethon.tl import types  # type: ignore
 from datetime import datetime
@@ -14,7 +16,7 @@ BOT_TOKEN = '7682182486:AAFLLXRZoN1tPu0taAPNqga31q_Eq6GDWpI'  # Замените
 CHAT_ID = '5159723893'  # Замените на ваш chat_id
 
 # Список пользователей для отслеживания (username или ID)
-users_to_track = ['5239948967', '5159723893']  # Замените на реальные username или ID
+users_to_track = ['5239948967']  # Замените на реальные username или ID
 
 # Создаем клиент Telegram
 client = TelegramClient('session_name', api_id, api_hash)
@@ -75,6 +77,36 @@ async def main():
     print("Скрипт запущен. Ожидание изменений статуса...")
     await client.run_until_disconnected()
 
+async def shutdown(signal, loop):
+    """Корректное завершение работы."""
+    print("\nЗавершение работы...")
+    await client.disconnect()
+    # Отменяем все задачи
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+    # Ожидаем завершения всех задач
+    await asyncio.gather(*tasks, return_exceptions=True)
+    loop.stop()
+
 if __name__ == '__main__':
-    with client:
-        client.loop.run_until_complete(main())
+    loop = asyncio.get_event_loop()
+
+    # Регистрируем обработчики сигналов
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(
+            sig,
+            lambda sig=sig: asyncio.create_task(shutdown(sig, loop))
+        )
+
+    try:
+        # Запускаем клиент
+        with client:
+            loop.run_until_complete(main())
+    except asyncio.CancelledError:
+        # Игнорируем ошибку отмены задач
+        pass
+    except Exception as e:
+        print(f"Ошибка: {e}")
+    finally:
+        loop.close()
